@@ -127,3 +127,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Additions for toxic_spans
+training/
+assets/
+corpus/
+metrics/
+project.lock
+# Ignore vim swap files
+.*.swp
+# Ignore PyCharm configuration files
+.idea/

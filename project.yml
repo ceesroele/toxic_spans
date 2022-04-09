@@ -1,0 +1,75 @@
+title: "SpanCategorizer project for toxic spans"
+description: "The SpanCategorizer is a component in **spaCy v3.1+** for assigning labels to contiguous spans of text proposed by a customizable suggester function. Unlike spaCy's EntityRecognizer component, the SpanCategorizer can recognize nested or overlapping spans. It also doesn't rely as heavily on consistent starting and ending words, so it may be a better fit for non-NER span labelling tasks. You do have to write a function that proposes your candidate spans, however. If your spans are often short, you could propose all spans under a certain size. You could also use syntactic constituents such as noun phrases or noun chunks, or matcher rules."
+spacy_version: ">=3.1.0,<4.0.0"
+
+vars:
+  config: "config"
+  gpu: -1
+  lang: "id"
+  spans_key: "txs"
+
+directories: ["assets", "training", "configs", "metrics", "corpus"]
+
+assets:
+  -
+    dest: "assets"
+    git:
+        repo: "https://github.com/ipavlopoulos/toxic_spans"
+        branch: "master"
+        path: "SemEval2021/data"
+
+workflows:
+  all:
+    - corpus
+    - train
+    - evaluate
+
+commands:
+
+  - name: corpus
+    help: "Convert the data to spaCy's format"
+    script:
+      - "python scripts/make_corpus.py"
+    deps:
+      - "scripts/make_corpus.py"
+      - "assets/tsd_train.csv"
+      - "assets/tsd_trial.csv"
+      - "assets/tsd_test.csv"
+    outputs:
+      - "corpus/train.spacy"
+      - "corpus/dev.spacy"
+      - "corpus/eval.spacy"
+
+  - name: train
+    help: "Train the pipeline"
+    script:
+      - "python -m spacy train configs/${vars.config}.cfg -o training/ --gpu-id ${vars.gpu} \
+          --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy"
+    deps:
+      - "corpus/train.spacy"
+      - "corpus/dev.spacy"
+      - "configs/${vars.config}.cfg"
+    outputs:
+      - "training/model-best"
+
+  - name: evaluate
+    help: "Evaluate on the test data and save the metrics"
+    script:
+      - "python scripts/evaluate_token.py ./training/model-best ./corpus/eval.spacy \
+        --output ./metrics/${vars.config}.json --gpu-id ${vars.gpu} --spans-key ${vars.spans_key}"
+      - "python scripts/evaluate_char.py"
+    deps:
+      - "training/model-best"
+      - "assets/tsd_test.csv"
+      - "corpus/eval.spacy"
+      - "scripts/evaluate_token.py"
+      - "scripts/evaluate_char.py"
+    outputs:
+      - "metrics/${vars.config}.json"
+
+  - name: clean
+    help: "Remove intermediate files"
+    script:
+      - "rm -rf training/*"
+      - "rm -rf metrics/*"
+      - "rm -rf corpus/*"
