@@ -2,7 +2,8 @@
 
 ## Introduction
 
-This is the code for the article ["Detecting Toxic Spans with spaCy"](https://cees-roele.medium.com/detecting-toxic-spans-with-spacy-c5533786bbf8).
+Release 1.0.0 contains the code for the article ["Detecting Toxic Spans with spaCy"](https://cees-roele.medium.com/detecting-toxic-spans-with-spacy-c5533786bbf8).
+Release 2.0.0 contains the code for the article ["Custom evaluation of spans in spaCy"](https://cees-roele.medium.com/custom-evaluation-of-spans-in-spacy-f1f2e7a99ad8).
 
 An expression is toxic if it uses rude, disrespectful, or unreasonable language 
 that is likely to make someone leave a discussion. Toxic language can be short 

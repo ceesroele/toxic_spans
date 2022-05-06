@@ -7,12 +7,16 @@ vars:
   gpu: -1
   lang: "id"
   spans_key: "txs"
+  code: "scripts/evaluate_char.py"
+  package_name: "toxic_detector"
+  package_version: "1.0.0"
 
-directories: ["assets", "training", "configs", "metrics", "corpus"]
+directories: ["assets", "training", "configs", "metrics", "corpus", "packages"]
 
 assets:
   -
     dest: "assets"
+    description: "Datasets from SemEval2021 Task-5 'Toxic Spans Detection'"
     git:
         repo: "https://github.com/ipavlopoulos/toxic_spans"
         branch: "master"
@@ -22,7 +26,10 @@ workflows:
   all:
     - corpus
     - train
+    - test
     - evaluate
+    - deploy
+    - post-deployment-test
 
 commands:
 
@@ -43,8 +50,10 @@ commands:
   - name: train
     help: "Train the pipeline"
     script:
-      - "python -m spacy train configs/${vars.config}.cfg -o training/ --gpu-id ${vars.gpu} \
-          --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy"
+      - "python -m spacy train configs/${vars.config}.cfg -o training/ \
+        --code ${vars.code} \
+        --gpu-id ${vars.gpu} \
+        --paths.train corpus/train.spacy --paths.dev corpus/dev.spacy"
     deps:
       - "corpus/train.spacy"
       - "corpus/dev.spacy"
@@ -52,12 +61,26 @@ commands:
     outputs:
       - "training/model-best"
 
+  - name: test
+    help: 'Test the trained pipeline'
+    script:
+      - 'python -m pytest ./scripts/tests/test_evaluate.py --html=metrics/test-evaluate-report.html'
+    deps:
+      - 'assets/tsd_train.csv'
+      - 'training/model-best'
+    outputs:
+      - 'metrics/test-report.html'
+    no_skip: true
+
   - name: evaluate
     help: "Evaluate on the test data and save the metrics"
     script:
       - "python scripts/evaluate_token.py ./training/model-best ./corpus/eval.spacy \
-        --output ./metrics/${vars.config}.json --gpu-id ${vars.gpu} --spans-key ${vars.spans_key}"
-      - "python scripts/evaluate_char.py"
+        --output ./metrics/${vars.config}.json --code ${vars.code} --gpu-id ${vars.gpu} \
+        --spans-key ${vars.spans_key}"
+      #- "python scripts/evaluate_char.py ./training/model-best ./corpus/eval.spacy \
+      #  --output ./metrics/${vars.config}.json --code ${vars.code} --gpu-id ${vars.gpu} \
+      #  --spans-key ${vars.spans_key}"
     deps:
       - "training/model-best"
       - "assets/tsd_test.csv"
@@ -67,9 +90,40 @@ commands:
     outputs:
       - "metrics/${vars.config}.json"
 
+  - name: deploy
+    help: "Package the best model so it can be installed, loaded, and called"
+    script:
+      - "python -m spacy package ./training/model-best ./packages \
+      --name ${vars.package_name} \
+      --version ${vars.package_version} \
+      --code ./scripts/evaluate_char.py"
+      - "pip install --ignore-installed \
+      ./packages/en_${vars.package_name}-${vars.package_version}/dist/\
+      en_${vars.package_name}-${vars.package_version}.tar.gz"
+    deps:
+      - "training/model-best"
+      - "scripts/evaluate_char.py"
+    outputs:
+      - packages/en_${vars.package_name}-${vars.package_version}
+
+  - name: post-deployment-test
+    help: 'Test the installed package'
+    script:
+      - 'python -m pytest ./scripts/tests/test_package.py --html=metrics/test-package-report.html'
+    deps:
+      - 'assets/tsd_train.csv'
+      - 'training/model-best'
+    outputs:
+      - 'metrics/test-package-report.html'
+    no_skip: true
+
   - name: clean
     help: "Remove intermediate files"
+    # NOTE: we can't write "rm -rf corpus/*" because spaCy wraps the argument in quotes,
+    #       which prevents the wildcard '*' from expanding.
+    #       Hence we delete the directories themselves
     script:
-      - "rm -rf training/*"
-      - "rm -rf metrics/*"
-      - "rm -rf corpus/*"
+      - "rm -rf corpus"
+      - "rm -rf training"
+      - "rm -rf metrics"
+      - "rm -rf packages"

@@ -1,37 +1,41 @@
 import csv
 import ast
+import pandas as pd
+from spacy.tokens import Doc, Span
 
 
-def read_data(fname: str):
+def read_data_csv(fname: str, max=None):
     """
     Read data from CSV file with rows (list(indexes), text)
     :param fname: (relative) path of file with CSV data
     """
+    counter = 0
     with open(fname, newline='') as csvfile:
         reader = csv.reader(csvfile)
         _ = next(reader)  # skip the headers
         for row in reader:
+            #print(row)
             lst = ast.literal_eval(row[0])
             text = row[1]
+            counter += 1
+            if max is not None and counter > max:
+                break
             yield lst, text
 
 
-def make_spans(lst):
-    """Split list of numbers into a list of (start,end) tuples,
-    e.g. [1,2,3,4,10,11,12] of indexes becomes [(1,5), (10,13)] (exclusive end index)"""
-    start = None
-    spans = []
-    last_d = None
-    for d in lst:
-        if last_d is None:
-            start = d
-        elif d > last_d + 1:
-            spans.append( (start, last_d + 1) )
-            start = d
-        last_d = d
-    if start is not None:
-        spans.append( (start, last_d + 1) )
-    return spans
+def read_data_df(fname: str, max:int=None):
+    df = pd.read_csv(fname)
+    df.spans = df.spans.apply(ast.literal_eval)
+    counter = 0
+    for span, text in zip(df.spans.to_list(), df.text.to_list()):
+        counter += 1
+        if max is not None and counter > max:
+            break
+        yield span, text
+
+
+def read_data(fname: str, max=None):
+    return read_data_csv(fname, max=max)
 
 
 if __name__ == '__main__':

@@ -138,3 +138,6 @@ project.lock
 .*.swp
 # Ignore PyCharm configuration files
 .idea/
+/ngramcounter.pkl
+/package.sh
+/pip_install.sh
